@@ -1,0 +1,67 @@
+# 冰機故障預警模型 - 設定檔
+# 複製這個檔案成 config.yaml(或其他名字),依場域調整後使用。
+# 所有程式(train.py / evaluate.py)都讀這份設定檔,不用改程式碼。
+
+data:
+  # merge_site_dataset.py 產生的單一場域CSV路徑
+  input_csv: "data/your_site_consolidated.csv"
+  datetime_col: "DateTime"
+  fault_col: "GlobalFault"
+
+  # ---- 這裡就是「不想只有19個參數」的地方 ----
+  # 把這份清單換成你場域實際有的analog欄位名稱,數量、順序都可以自由調整。
+  # 程式會自動用這份清單裡的欄位數量當作模型的input/output維度,不需要改任何程式碼。
+  feature_columns:
+    - COP
+    - kW/ton
+    - 冰水出水壓力
+    - 冰水出水溫度
+    - 冰水回水溫度
+    - 冰水水流量
+    - 冰水進水壓力
+    - 冷凝能力
+    - 冷卻水出水壓力
+    - 冷卻水出水溫度
+    - 冷卻水回水溫度
+    - 冷卻水水流量
+    - 冷卻水進水壓力
+    - 控制壓比
+    - 熱平衡
+    - 總耗電量
+    - 蒸發能力
+    - 製冷能力
+    - 負載比例
+
+  # 已知資料品質有問題、近乎常數的欄位(例如壞掉的壓力感測器)。
+  # 這些欄位仍然會被預測,但在evaluate.py計算z-score異常分數時會被排除,
+  # 避免方差趨近於0的欄位讓z-score失真或變成nan。
+  dead_columns: []
+  # 範例: ["冰水出水壓力", "冷卻水出水壓力"]
+
+model:
+  lookback_minutes: 30 # 用過去幾分鐘預測
+  horizon_minutes: 10 # 預測未來幾分鐘
+  hidden_dim: 256 # LSTM隱藏層維度
+  num_layers: 3 # LSTM層數
+
+split:
+  # train/test依「連續時間區間」分層抽樣(詳見README),不是單純依日期切,
+  # 目的是讓train/test都拿到公平比例的故障事件、且不會因為滑動視窗重疊而外洩。
+  test_fraction: 0.20
+  random_seed: 42
+
+training:
+  epochs: 300
+  batch_size: 2048
+  learning_rate: 0.01
+  # 滑動視窗下「正常->正常」樣本數量非常龐大且高度重疊,用這個上限做隨機抽樣
+  # 控制訓練資料量與記憶體用量;「正常->異常」樣本(稀有)永遠全部保留,不受此上限影響。
+  # 設為 null 代表不抽樣、全部使用(需要較大記憶體)。
+  normal_sample_cap: 120000
+
+output:
+  output_dir: "outputs/run1"
+
+# 異常分數threshold候選(在evaluate.py裡,用訓練集「正常->正常」的分布算出這些百分位)
+evaluation:
+  threshold_percentiles: [90, 95, 99, 99.9]

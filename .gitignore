@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 資料與訓練產物不進版控(通常很大、且各場域不同)
+data/
+outputs/
+*.csv
+*.xlsx
+!configs/*.yaml
+
+.vscode/
+.idea/
